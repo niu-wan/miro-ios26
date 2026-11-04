@@ -1,0 +1,253 @@
+checking for a BSD-compatible install... /home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/install -c
+checking build system type... x86_64-pc-linux-gnu
+checking host system type... x86_64-pc-linux-gnu
+checking for gcc... gcc
+checking whether the C compiler works... yes
+checking for C compiler default output file name... a.out
+checking for suffix of executables... 
+checking whether we are cross compiling... no
+checking for suffix of object files... o
+checking whether the compiler supports GNU C... yes
+checking whether gcc accepts -g... yes
+checking for gcc option to enable C11 features... none needed
+checking for ld used by gcc... /usr/bin/x86_64-linux-gnu-ld
+checking if the linker (/usr/bin/x86_64-linux-gnu-ld) is GNU ld... yes
+checking for shared library run path origin... done
+checking 32-bit host C ABI... no
+checking how to run the C preprocessor... gcc -E
+checking for egrep -e... /usr/bin/grep -E
+checking for ELF binary format... yes
+checking for the common suffixes of directories in the library search path... lib,lib,lib64
+checking for iconv... yes
+checking for working iconv... yes
+checking whether iconv is compatible with its POSIX signature... yes
+checking cached host tuple... ok
+configure: using configuration file `linux'
+checking for gcc... (cached) gcc
+checking whether the compiler supports GNU C... (cached) yes
+checking whether gcc accepts -g... (cached) yes
+checking for gcc option to enable C11 features... (cached) none needed
+checking how to run the C preprocessor... gcc -E
+checking for gencat... /usr/bin/gencat
+checking for library containing crypt... -lcrypt
+checking for library containing getspnam... none required
+checking for library containing tgetent... -ltinfo
+checking for library containing gethostbyname... none required
+checking for library containing connect... none required
+checking for library containing catgets... none required
+checking for stdio.h... yes
+checking for stdlib.h... yes
+checking for string.h... yes
+checking for inttypes.h... yes
+checking for stdint.h... yes
+checking for strings.h... yes
+checking for sys/stat.h... yes
+checking for sys/types.h... yes
+checking for unistd.h... yes
+checking for auth.h... no
+checking for crypt.h... yes
+checking for features.h... yes
+checking for inttypes.h... (cached) yes
+checking for paths.h... yes
+checking for shadow.h... yes
+checking for stdint.h... (cached) yes
+checking for utmp.h... yes
+checking for utmpx.h... yes
+checking for wchar.h... yes
+checking size of wchar_t... 4
+checking for wctype.h... yes
+checking for dirent.h that defines DIR... yes
+checking for library containing opendir... none required
+checking whether stat file-mode macros are broken... no
+checking for long long... yes
+checking for uid_t... yes
+checking for gid_t... yes
+checking type of array argument to getgroups... gid_t
+checking for mode_t... yes
+checking for size_t... yes
+checking for uid_t... (cached) yes
+checking for gid_t... (cached) yes
+checking for uint32_t... yes
+checking for ssize_t... yes
+checking for socklen_t... yes
+checking for struct dirent.d_ino... yes
+checking for struct utmp.ut_host... yes
+checking for struct utmp.ut_user... yes
+checking for struct utmp.ut_tv... yes
+checking for struct utmp.ut_xtime... no
+checking for struct utmpx.ut_host... yes
+checking for struct utmpx.ut_user... yes
+checking for struct utmpx.ut_tv... yes
+checking for struct utmpx.ut_xtime... no
+checking for struct sockaddr_storage.ss_family... yes
+checking for an ANSI C-conforming const... yes
+checking for working volatile... yes
+checking for gcc options needed to detect all undeclared functions... none needed
+checking whether crypt is declared... yes
+checking whether environ is declared... yes
+checking whether gethostname is declared... yes
+checking whether getpgrp is declared... yes
+checking for setlocale... yes
+checking for catgets... yes
+checking for dup2... yes
+checking for getauthid... no
+checking for getcwd... yes
+checking for gethostname... yes
+checking for getpwent... yes
+checking for getutent... yes
+checking for getutxent... yes
+checking for mallinfo... yes
+checking for mallinfo2... yes
+checking for mblen... yes
+checking for memmove... yes
+checking for memset... yes
+checking for mkstemp... yes
+checking for nice... yes
+checking for setproctitle... no
+checking for nl_langinfo... yes
+checking for sbrk... yes
+checking for setpgid... yes
+checking for setpriority... yes
+checking for strerror... yes
+checking for strstr... yes
+checking for sysconf... yes
+checking for wcwidth... yes
+checking whether getpgrp requires zero arguments... yes
+checking whether mbrtowc and mbstate_t are properly declared... yes
+checking whether setpgrp requires zero arguments... yes
+checking for working strcoll... yes
+checking for working sbrk... yes
+configure: creating ./config.status
+config.status: creating Makefile
+config.status: creating atlocal
+config.status: creating dch-template
+config.status: creating nls/Makefile
+config.status: creating patchlevel.h
+config.status: creating tcsh.man
+config.status: creating config.h
+config.status: executing ./atconfig commands
+configure: ========= Configuration results =========
+configure: BUILD_CATALOGS          yes
+configure: CC                      gcc
+configure: CC_FOR_GETHOST          $(CC)
+configure: CFLAGS_FOR_BUILD        $(CFLAGS)
+configure: CPPFLAGS_FOR_BUILD      $(CPPFLAGS)
+configure: LDFLAGS_FOR_BUILD       $(LDFLAGS)
+configure: CFLAGS                  -g -O2
+configure: CPP                     gcc -E
+configure: CPPFLAGS                
+configure: DFLAGS                  
+configure: HESDEF                  
+configure: HESLIB                  
+configure: LDFLAGS                 
+configure: LIBICONV                
+configure: LIBS                    -ltinfo -lcrypt 
+configure: PACKAGE_CHANGELOG_DATE  Wed, 09 Jul 2025 00:00:00 +0000
+configure: PACKAGE_DATE            2025-07-09
+configure: PACKAGE_ENGLISH_DATE    July 9, 2025
+configure: PACKAGE_PATCHLEVEL      16
+configure: PACKAGE_REV             6
+configure: PACKAGE_VERS            24
+configure: PACKAGE_VERSION         6.24.16
+configure: RELEASE_TAG             TCSH6_24_16
+configure: tcsh_config_file        system/linux
+configure: =========================================
+grep 'ERR_' ./sh.err.c | grep '^#define' >> sh.err.h.tmp
+grep '[FV]_' ./ed.defns.c | grep '^#define' >> ed.defns.h.tmp
+sh.err.h recreated.
+ed.defns.h recreated.
+make[1]: 进入目录“/home/niu/project/dome/hakios-ref/base/xnu-deps/tcsh/nls”
+gcc -E -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    -D_h_tc_const\
+    ./tc.const.c | \
+    sed -n -e 's/^\(Char STR[a-zA-Z0-9_]*\) *\[ *\].*/extern \1[];/p' | \
+    LC_ALL=C sort >> tc.const.h.tmp
+C
+et
+finnish
+french
+german
+greek
+italian
+ja
+pl
+russian
+spanish
+tc.const.h recreated.
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.dir.c
+ukrainian
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.dol.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.err.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.exec.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.char.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.exp.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.file.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.func.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.glob.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.hist.c
+make[1]: 离开目录“/home/niu/project/dome/hakios-ref/base/xnu-deps/tcsh/nls”
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.init.c
+sh.dir.c: In function ‘skipargs’:
+sh.dir.c:205:24: warning: assignment discards ‘const’ qualifier from pointer target type [-Wdiscarded-qualifiers]
+  205 |                 if ((p = strchr(dstr, *s++)) != NULL)
+      |                        ^
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.lex.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.misc.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.parse.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.print.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.proc.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.sem.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.set.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    sh.time.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    glob.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    dotlock.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    mi.termios.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    ma.setp.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    vms.termcap.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tw.help.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tw.init.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tw.parse.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tw.spell.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tw.comp.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tw.color.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    ed.chared.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    ed.refresh.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    ed.screen.c
+tw.color.c: In function ‘color’:
+tw.color.c:273:25: warning: assignment discards ‘const’ qualifier from pointer target type [-Wdiscarded-qualifiers]
+  273 |     if (x == '\0' || (p = strchr(ccolors, x)) == NULL)
+      |                         ^
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    ed.init.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    ed.inputl.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    ed.defns.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    ed.xmap.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    ed.term.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tc.alloc.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tc.bind.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tc.const.c
+gcc -c -I. -I. -g -O2 ./gethost.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tc.disc.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tc.func.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tc.nls.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tc.os.c
+tc.func.c: In function ‘find_stop_ed’:
+tc.func.c:550:20: warning: assignment discards ‘const’ qualifier from pointer target type [-Wdiscarded-qualifiers]
+  550 |             if ((p = strrchr(ep, '/')) != NULL)         /* if it has a path */
+      |                    ^
+tc.func.c:557:20: warning: assignment discards ‘const’ qualifier from pointer target type [-Wdiscarded-qualifiers]
+  557 |             if ((p = strrchr(vp, '/')) != NULL)         /* and it has a path */
+      |                    ^
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tc.printf.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tc.prompt.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tc.sched.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tc.sig.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tc.str.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tc.vers.c
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tc.who.c
+rm -f gethost
+gcc -o gethost -I. -I. -g -O2  gethost.o
+./gethost ./host.defs >> tc.defs.c.tmp
+tc.defs.c recreated.
+gcc -c -g -O2 -I. -I. -D_PATH_TCSHELL='"/home/niu/project/dome/hakios-ref/base/xnu-deps/host/bin/tcsh"'    tc.defs.c
+rm -f tcsh core
+gcc -o tcsh  -g -O2 -I. -I. sh.o sh.dir.o sh.dol.o sh.err.o sh.exec.o sh.char.o sh.exp.o sh.file.o sh.func.o sh.glob.o sh.hist.o sh.init.o sh.lex.o sh.misc.o sh.parse.o sh.print.o sh.proc.o sh.sem.o sh.set.o sh.time.o glob.o dotlock.o mi.termios.o ma.setp.o vms.termcap.o tw.help.o tw.init.o tw.parse.o tw.spell.o tw.comp.o tw.color.o ed.chared.o ed.refresh.o ed.screen.o ed.init.o ed.inputl.o ed.defns.o ed.xmap.o ed.term.o tc.alloc.o tc.bind.o tc.const.o tc.defs.o tc.disc.o tc.func.o tc.nls.o tc.os.o tc.printf.o tc.prompt.o tc.sched.o tc.sig.o tc.str.o tc.vers.o tc.who.o  -ltinfo -lcrypt   
