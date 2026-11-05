@@ -1,0 +1,221 @@
+name: ios26-usermode
+
+# 目的：在 macOS runner 上把 iOS 26 IPSW 的 AEA 加密卷解开，抽出用户态需要的东西。
+#
+# 为什么必须在 macOS 上跑：
+#   .dmg.aea 是 AEA profile 1（对称密钥），密钥要经 WKMS 取回后用 EC P-256 私钥解封。
+#   macOS 自带 /usr/bin/aea，是 Apple 官方实现；解开后是 APFS 镜像，靠 hdiutil 挂载。
+#   Linux 上既没有 aea，也没有 /dev/fuse（本机实测没有），挂不了 APFS。
+#
+# 关键技巧：IPSW 是 ZIP64，但目标 .dmg.aea 是 STORED（不压缩），
+#   所以用 HTTP Range 只取需要的字节区间，不用下 11.4 GB 整包。
+
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: "要解哪个卷"
+        required: true
+        default: "cryptex"
+        type: choice
+        options:
+          - cryptex   # Cryptex1,SystemOS (1.9 GB) —— dyld 共享缓存在这
+          - systemos  # OS 主卷 (8.3 GB) —— rootfs
+          - both
+      keep_dmg:
+        description: "是否保留解密后的 dmg（占空间，默认删）"
+        required: false
+        default: false
+        type: boolean
+
+env:
+  IPSW_URL: "https://updates.cdn-apple.com/2026SummerFCS/1a337b3d-ffd8-424a-abc4-092b64d551ab/iPhone18,2_26.6.2_23G90_Restore.ipsw"
+  IPSW_NAME: "iPhone18,2_26.6.2_23G90_Restore.ipsw"
+  CRYPTEX_ENTRY: "094-97204-090.dmg.aea"
+  OS_ENTRY: "094-95330-090.dmg.aea"
+
+jobs:
+  # ── 1) Cryptex1,SystemOS：dyld 共享缓存 ────────────────────────────────
+  cryptex:
+    if: ${{ inputs.component == 'cryptex' || inputs.component == 'both' }}
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 腾磁盘（runner 默认只剩 ~14 GB）
+        run: |
+          df -h /
+          sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/* 2>/dev/null || true
+          sudo rm -rf "$HOME/Library/Developer/Xcode/DerivedData"/* 2>/dev/null || true
+          sudo rm -rf /Applications/Xcode_*.app 2>/dev/null || true
+          sudo rm -rf /usr/local/share/dotnet 2>/dev/null || true
+          df -h /
+
+      - name: 安装 ipsw
+        run: |
+          set -euo pipefail
+          curl -fL --retry 5 --retry-delay 3 -o ipsw.tar.gz \
+            https://github.com/blacktop/ipsw/releases/download/v3.1.741/ipsw_3.1.741_macOS_universal.tar.gz
+          tar xzf ipsw.tar.gz
+          sudo mv ipsw /usr/local/bin/ipsw
+          sudo chmod +x /usr/local/bin/ipsw
+          xattr -cr /usr/local/bin/ipsw || true
+          ipsw version
+          echo "=== aea 子命令用法（存档，供排查）==="
+          ipsw fw aea --help || true
+
+      - name: 用 Range 取 Cryptex1,SystemOS
+        run: |
+          set -euo pipefail
+          python3 scripts/fetch-aea.py "$IPSW_URL" "$CRYPTEX_ENTRY" "work/$CRYPTEX_ENTRY"
+          ls -la work/
+          df -h /
+
+      - name: AEA 元信息
+        run: |
+          ipsw fw aea --info "work/$CRYPTEX_ENTRY" || true
+
+      - name: 解密
+        run: |
+          set -euo pipefail
+          mkdir -p dmg
+          # 策略 A：ipsw 全自动（内嵌 PEM → 本地 pem-db → 向 WKMS 请求）
+          if ipsw fw aea "work/$CRYPTEX_ENTRY" --output dmg/ ; then
+            echo "STRATEGY=A ok"
+          else
+            echo "策略 A 失败，试 B：先导出 pem 再解"
+            ipsw fw aea --fcs-key "work/$CRYPTEX_ENTRY" || true
+            [ -f fcs-keys.json ] && ipsw fw aea --pem-db fcs-keys.json "work/$CRYPTEX_ENTRY" --output dmg/ || true
+          fi
+          ls -la dmg/ || true
+          echo "=== 解出来的东西 ==="
+          find . -maxdepth 2 -name "*.dmg" -printf "%p %s\n" || true
+          df -h /
+
+      - name: 挂载 APFS
+        id: mount
+        run: |
+          set -euo pipefail
+          DMG=$(find dmg -name "*.dmg" | head -1)
+          [ -n "$DMG" ] || { echo "没有解出 dmg"; exit 1; }
+          echo "dmg=$DMG"
+          hdiutil attach "$DMG" -noverify -noautoopen -mountpoint /Volumes/ios26 2>&1 | tail -5
+          ls -la /Volumes/ios26 | head -20
+          echo "=== 找 dyld 缓存 ==="
+          find /Volumes/ios26 -maxdepth 6 -name "dyld_shared_cache*" -printf "%p %s\n" 2>/dev/null | head -20 || true
+          find /Volumes/ios26 -maxdepth 6 -type d -name dyld -printf "%p\n" 2>/dev/null | head || true
+
+      - name: 抽取 dyld 缓存与 cryptex 元数据
+        run: |
+          set -euo pipefail
+          mkdir -p out/dyld
+          cp -R /Volumes/ios26/System/Library/dyld/. out/dyld/ 2>/dev/null || \
+            find /Volumes/ios26 -maxdepth 6 -name "dyld_shared_cache*" -exec cp {} out/dyld/ \;
+          ls -la out/dyld | head -20
+          du -sh out/dyld || true
+          # 顺带把 SystemOS 的目录骨架存一份，便于后续规划
+          find /Volumes/ios26 -maxdepth 3 > out/cryptex-layout.txt 2>/dev/null || true
+
+      - name: 卸载
+        if: always()
+        run: hdiutil detach /Volumes/ios26 -force 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios26-dyld-cache
+          path: |
+            out/dyld
+            out/cryptex-layout.txt
+          if-no-files-found: warn
+          compression-level: 0
+
+  # ── 2) OS 主卷：rootfs ────────────────────────────────────────────────
+  systemos:
+    if: ${{ inputs.component == 'systemos' || inputs.component == 'both' }}
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 腾磁盘（这次要 ~20 GB）
+        run: |
+          df -h /
+          sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/* 2>/dev/null || true
+          sudo rm -rf "$HOME/Library/Developer/Xcode/DerivedData"/* 2>/dev/null || true
+          sudo rm -rf /Applications/Xcode_*.app 2>/dev/null || true
+          sudo rm -rf /usr/local/share/dotnet 2>/dev/null || true
+          sudo rm -rf /usr/local/lib/node_modules 2>/dev/null || true
+          df -h /
+
+      - name: 安装 ipsw
+        run: |
+          set -euo pipefail
+          curl -fL --retry 5 --retry-delay 3 -o ipsw.tar.gz \
+            https://github.com/blacktop/ipsw/releases/download/v3.1.741/ipsw_3.1.741_macOS_universal.tar.gz
+          tar xzf ipsw.tar.gz
+          sudo mv ipsw /usr/local/bin/ipsw
+          sudo chmod +x /usr/local/bin/ipsw
+          xattr -cr /usr/local/bin/ipsw || true
+          ipsw version
+
+      - name: 用 Range 取 OS 主卷（8.3 GB）
+        run: |
+          set -euo pipefail
+          python3 scripts/fetch-aea.py "$IPSW_URL" "$OS_ENTRY" "work/$OS_ENTRY"
+          ls -la work/
+          df -h /
+
+      - name: 解密主卷
+        run: |
+          set -euo pipefail
+          mkdir -p dmg
+          if ipsw fw aea "work/$OS_ENTRY" --output dmg/; then
+            echo "STRATEGY=A ok"
+          else
+            ipsw fw aea --fcs-key "work/$OS_ENTRY" || true
+            [ -f fcs-keys.json ] && ipsw fw aea --pem-db fcs-keys.json "work/$OS_ENTRY" --output dmg/ || true
+          fi
+          find . -maxdepth 2 -name "*.dmg" -printf "%p %s\n" || true
+          df -h /
+
+      - name: 挂载
+        run: |
+          set -euo pipefail
+          DMG=$(find dmg -name "*.dmg" | head -1)
+          [ -n "$DMG" ] || { echo "没有解出 dmg"; exit 1; }
+          hdiutil attach "$DMG" -noverify -noautoopen -mountpoint /Volumes/ios26os 2>&1 | tail -5
+          ls /Volumes/ios26os
+          df -h /
+
+      - name: 抽取 rootfs 精简集
+        run: |
+          set -euo pipefail
+          mkdir -p out/rootfs
+          R=/Volumes/ios26os
+          # 先存完整路径清单，后续按需再取，避免一次搬 8 GB
+          find "$R" -maxdepth 4 > out/rootfs-layout.txt 2>/dev/null || true
+          for d in bin sbin usr/lib usr/bin usr/sbin System/Library/Frameworks \
+                   System/Library/PrivateFrameworks System/Library/CoreServices \
+                   System/Library/LaunchDaemons System/Library/dyld; do
+            if [ -e "$R/$d" ]; then
+              mkdir -p "out/rootfs/$(dirname $d)"
+              cp -R "$R/$d" "out/rootfs/$d" 2>/dev/null || echo "跳过 $d（可能太大或含不可读文件）"
+              echo "已取 $d"
+            fi
+          done
+          du -sh out/rootfs || true
+          df -h /
+
+      - name: 卸载
+        if: always()
+        run: hdiutil detach /Volumes/ios26os -force 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios26-rootfs
+          path: |
+            out/rootfs
+            out/rootfs-layout.txt
+          if-no-files-found: warn
+          compression-level: 6
