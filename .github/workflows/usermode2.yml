@@ -1,0 +1,182 @@
+name: ios26-usermode-2
+
+# 第二轮：产出"手机可直接下载"的小体积产物。
+#
+# 背景（第一轮的结论）：
+#   - AEA 解密在 Linux 上也能做（ipsw 内置 FCS key），不必依赖 macOS。
+#   - 但 APFS 里的文件大量使用 decmpfs 透明压缩（LZVN/LZFSE/LZBITMAP），
+#     Linux 侧（7z）只能拿到压缩后的 resource fork，解不回来。
+#     所以"解压"这一步必须留在 macOS 上做。
+#   - 第一轮 rootfs 上传失败与体积无关：某个文件名里带 '*'，
+#     upload-artifact 直接拒绝该路径。这次一律先 tar 再传。
+#
+# 本 workflow 只产出两样东西：
+#   1) dyld-extra : cryptex 里 3 个 .dyldlinkedit（decmpfs 压缩）解压后的原件 + 全量校验清单
+#   2) rootfs-core: OS 主卷的"能启动所需"精简集（tar.gz）+ 完整路径清单
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "产出哪一份"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - both
+          - dyld-extra
+          - rootfs-core
+
+env:
+  IPSW_URL: "https://updates.cdn-apple.com/2026SummerFCS/1a337b3d-ffd8-424a-abc4-092b64d551ab/iPhone18,2_26.6.2_23G90_Restore.ipsw"
+  CRYPTEX_ENTRY: "094-97204-090.dmg.aea"
+  OS_ENTRY: "094-95330-090.dmg.aea"
+
+jobs:
+  dyld-extra:
+    if: ${{ inputs.target == 'dyld-extra' || inputs.target == 'both' }}
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 腾磁盘
+        run: |
+          sudo rm -rf /Applications/Xcode_*.app /usr/local/share/dotnet 2>/dev/null || true
+          df -h /
+
+      - name: 装 ipsw
+        run: |
+          set -euo pipefail
+          curl -fL --retry 5 -o /tmp/ipsw.tar.gz \
+            https://github.com/blacktop/ipsw/releases/download/v3.1.741/ipsw_3.1.741_macOS_universal.tar.gz
+          tar xzf /tmp/ipsw.tar.gz -C /tmp
+          sudo mv /tmp/ipsw /usr/local/bin/ipsw && sudo chmod +x /usr/local/bin/ipsw
+          xattr -cr /usr/local/bin/ipsw || true
+          ipsw version
+
+      - name: 取并解密 cryptex
+        run: |
+          set -euo pipefail
+          python3 scripts/fetch-aea.py "$IPSW_URL" "$CRYPTEX_ENTRY" "work/$CRYPTEX_ENTRY"
+          mkdir -p dmg
+          ipsw fw aea "work/$CRYPTEX_ENTRY" --output dmg/
+          ls -la dmg/
+
+      - name: 挂载
+        run: |
+          set -euo pipefail
+          hdiutil attach dmg/*.dmg -noverify -noautoopen -mountpoint /Volumes/cx | tail -3
+
+      - name: 解出 decmpfs 压缩的几个缓存文件（macOS 读取时自动解压）
+        run: |
+          set -euo pipefail
+          C=/Volumes/cx/System/Library/Caches/com.apple.dyld
+          mkdir -p out/dyld-extra
+          # 这些在 APFS 上是透明压缩的，Linux 侧只能拿到压缩流
+          for f in "$C"/*.dyldlinkedit; do
+            [ -e "$f" ] || continue
+            echo "解压 $(basename "$f")"
+            cp "$f" out/dyld-extra/
+          done
+          ls -la out/dyld-extra/
+          echo "=== 校验：与卷上大小一致 ==="
+          for f in out/dyld-extra/*; do
+            b=$(basename "$f")
+            echo "$b  src=$(stat -f%z "$C/$b")  dst=$(stat -f%z "$f")"
+          done
+
+      - name: 全量缓存清单与校验和
+        run: |
+          set -euo pipefail
+          C=/Volumes/cx/System/Library/Caches/com.apple.dyld
+          mkdir -p out
+          ( cd "$C" && shasum -a 256 dyld_shared_cache_arm64e* ) > out/dyld-sha256.txt
+          ( cd "$C" && ls -l ) > out/dyld-ls.txt
+          find /Volumes/cx -maxdepth 5 > out/cryptex-layout.txt 2>/dev/null || true
+          wc -l out/dyld-sha256.txt out/dyld-ls.txt
+          head -3 out/dyld-sha256.txt
+
+      - name: 卸载
+        if: always()
+        run: hdiutil detach /Volumes/cx -force 2>/dev/null || true
+
+      - name: 打包（避免文件名里的特殊字符）
+        run: |
+          set -euo pipefail
+          cd out && tar -czf ../dyld-extra.tar.gz dyld-extra dyld-sha256.txt dyld-ls.txt cryptex-layout.txt
+          cd .. && ls -la dyld-extra.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dyld-extra
+          path: dyld-extra.tar.gz
+          compression-level: 0
+
+  rootfs-core:
+    if: ${{ inputs.target == 'rootfs-core' || inputs.target == 'both' }}
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 腾磁盘
+        run: |
+          sudo rm -rf /Applications/Xcode_*.app /usr/local/share/dotnet /usr/local/lib/node_modules 2>/dev/null || true
+          df -h /
+
+      - name: 装 ipsw
+        run: |
+          set -euo pipefail
+          curl -fL --retry 5 -o /tmp/ipsw.tar.gz \
+            https://github.com/blacktop/ipsw/releases/download/v3.1.741/ipsw_3.1.741_macOS_universal.tar.gz
+          tar xzf /tmp/ipsw.tar.gz -C /tmp
+          sudo mv /tmp/ipsw /usr/local/bin/ipsw && sudo chmod +x /usr/local/bin/ipsw
+          xattr -cr /usr/local/bin/ipsw || true
+          ipsw version
+
+      - name: 取并解密 OS 主卷
+        run: |
+          set -euo pipefail
+          python3 scripts/fetch-aea.py "$IPSW_URL" "$OS_ENTRY" "work/$OS_ENTRY"
+          mkdir -p dmg
+          ipsw fw aea "work/$OS_ENTRY" --output dmg/
+          ls -la dmg/
+
+      - name: 挂载
+        run: |
+          set -euo pipefail
+          hdiutil attach dmg/*.dmg -noverify -noautoopen -mountpoint /Volumes/os | tail -3
+          ls /Volumes/os
+
+      - name: 抽取启动所需精简集（tar 直出，不解到磁盘）
+        run: |
+          set -euo pipefail
+          R=/Volumes/os
+          find "$R" -maxdepth 4 > rootfs-layout.txt 2>/dev/null || true
+          wc -l rootfs-layout.txt
+          LIST=""
+          for d in bin sbin usr/lib usr/bin usr/sbin usr/standalone \
+                   System/Library/CoreServices System/Library/LaunchDaemons \
+                   System/Library/Frameworks System/Library/PrivateFrameworks \
+                   System/Library/dyld System/Library/PrivateFrameworks/CoreSymbolication.framework; do
+            if [ -e "$R/$d" ]; then LIST="$LIST $d"; fi
+          done
+          echo "将打包:$LIST"
+          # COPYFILE_DISABLE 避免生成 ._ 资源分叉文件
+          COPYFILE_DISABLE=1 tar -czf rootfs-core.tar.gz -C "$R" $LIST
+          ls -la rootfs-core.tar.gz
+          du -sh rootfs-core.tar.gz
+          df -h /
+
+      - name: 卸载
+        if: always()
+        run: hdiutil detach /Volumes/os -force 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rootfs-core
+          path: |
+            rootfs-core.tar.gz
+            rootfs-layout.txt
+          compression-level: 0
