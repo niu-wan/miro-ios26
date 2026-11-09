@@ -1,9 +1,8 @@
 name: build-miro-kernel
 
 on:
+  # 内核已在 Linux 上编出来了，这里只保留手动触发，避免每次 push 白烧 macOS 额度
   workflow_dispatch:
-  push:
-    branches: [main]
 
 jobs:
   kernel:
@@ -40,6 +39,12 @@ jobs:
           git apply --whitespace=nowarn ../kernel/xnu-12377.121.6-dada.patch
           cp ../focaltech/redwood_focaltech_fw.h bsd/dev/
           echo "补丁已打"
+
+      - name: 修 config 里的 /dev/null（kextsymboltool 需要可寻址的输出）
+        run: |
+          cd xnu-src
+          sed -i '' 's|-output /dev/null|-output $(OBJPATH)/export-check.out|g' config/Makefile
+          grep -n "export-check.out" config/Makefile | head -3
 
       - name: 准备依赖（macOS 走 Xcode 的 cctools/mig，不用 theos）
         env:
