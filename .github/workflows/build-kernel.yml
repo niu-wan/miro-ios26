@@ -64,6 +64,20 @@ jobs:
           sudo cp xnu-deps/AvailabilityVersions/availability.pl "$SDK/usr/local/libexec/"
           ls -la "$SDK/usr/local/libexec/availability.pl"
 
+      - name: 在 macOS 上把 xnu-clang 做成直通 Xcode clang
+        run: |
+          mkdir -p xnu-deps/host/bin
+          cat > xnu-deps/host/bin/xnu-clang <<'SH'
+          #!/bin/bash
+          exec xcrun --sdk iphoneos clang "$@"
+          SH
+          cat > xnu-deps/host/bin/xnu-clang++ <<'SH'
+          #!/bin/bash
+          exec xcrun --sdk iphoneos clang++ "$@"
+          SH
+          chmod +x xnu-deps/host/bin/xnu-clang xnu-deps/host/bin/xnu-clang++
+          PATH="$PWD/xnu-deps/host/bin:$PATH" xnu-clang --version | head -2
+
       - name: 编内核（arm64e）
         env:
           XNU_SRC: ${{ github.workspace }}/xnu-src
