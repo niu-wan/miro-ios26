@@ -86,6 +86,18 @@ jobs:
           chmod +x xnu-deps/setup.sh xnu-build.sh
           bash xnu-deps/setup.sh 2>&1 | tail -40
 
+      - name: 把 setup 生成的 usr/local 同步进 Xcode SDK（firehose 头在这里）
+        run: |
+          set -x
+          SRC=$(ls -d xnu-deps/sdk/*/ | head -1)
+          XS=$(xcrun --sdk iphoneos --show-sdk-path)
+          echo "SRC=$SRC"; echo "XS=$XS"
+          ls -R "$SRC/usr/local/include" | head -20 || true
+          sudo mkdir -p "$XS/usr/local"
+          sudo cp -R "$SRC/usr/local/." "$XS/usr/local/" || true
+          sudo chmod 755 "$XS/usr/local/libexec/availability.pl" || true
+          ls -l "$XS/usr/local/include/kernel/os/" | head -10 || true
+
       - name: 编内核（arm64e）
         env:
           XNU_SRC: ${{ github.workspace }}/xnu-src
