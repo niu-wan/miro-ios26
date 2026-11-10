@@ -94,7 +94,24 @@ jobs:
           MACHINE: BCM2837
         run: |
           set -x
-          bash xnu-deps/setup.sh --stage2 2>&1 | tail -15 || true
+          # libfirehose 手工构建（用源码树的头，而不是被 unifdef 过的 EXPORT_HDRS）
+          S=xnu-src
+          mkdir -p xnu-deps/build/firehose
+          xnu-clang -arch arm64e -c -Os -mkernel -nostdinc -fno-builtin \
+            -DKERNEL=1 -DKERNEL_PRIVATE=1 -DXNU_KERNEL_PRIVATE=1 -DPRIVATE=1 -D__DARWIN_64_BIT_INO_T=1 \
+            -DDISPATCH_USE_DTRACE=0 -DOS_ATOMIC_CONFIG_MEMORY_ORDER_DEPENDENCY=1 \
+            -DOS_ATOMIC_CONFIG_STARVATION_FREE_ONLY=0 -DOS_FIREHOSE_SPI=1 -DARM64_BOARD_CONFIG_BCM2837 \
+            -Ixnu-deps/libdispatch -Ixnu-deps/libdispatch/src -Ixnu-deps/libdispatch/src/firehose \
+            -I$S/osfmk -I$S/bsd -I$S/libkern -I$S/pexpert -I$S/iokit -I$S/security \
+            -I$S/libkern/firehose -I$S/libkern/os -I$S/EXTERNAL_HEADERS \
+            -Ixnu-deps/sdk/iPhoneOS26.5.xnu.sdk/usr/local/include/kernel \
+            -o xnu-deps/build/firehose/firehose_buffer.o \
+            xnu-deps/libdispatch/src/firehose/firehose_buffer.c 2>&1 | tail -20 || true
+          ls -l xnu-deps/build/firehose/firehose_buffer.o || true
+          libtool -static -o xnu-deps/sdk/iPhoneOS26.5.xnu.sdk/usr/local/lib/kernel/libfirehose_kernel.a \
+            xnu-deps/build/firehose/firehose_buffer.o 2>&1 | tail -3 || true
+          ls -l xnu-deps/sdk/iPhoneOS26.5.xnu.sdk/usr/local/lib/kernel/ || true
+
           SRC=$(ls -d xnu-deps/sdk/*/ | head -1)
           XS=$(xcrun --sdk iphoneos --show-sdk-path)
           echo "SRC=$SRC"; echo "XS=$XS"
