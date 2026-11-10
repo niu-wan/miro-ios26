@@ -98,6 +98,22 @@ jobs:
           echo "---- 产物 ----"
           ls -la xnu-src/BUILD/obj/DEVELOPMENT_ARM64_BCM2837/ | head -20 || true
 
+      - name: 内核传到 release（artifact 配额已满，走 release 资产）
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          K=xnu-src/BUILD/obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837
+          if [ -f "$K" ]; then
+            TAG=kernel-builds
+            gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" -t "kernel builds" -n "自动上传的 arm64e 内核" || true
+            cp "$K" mach.development.bcm2837.arm64e
+            shasum -a 256 mach.development.bcm2837.arm64e | tee kernel.sha256
+            gh release upload "$TAG" mach.development.bcm2837.arm64e kernel.sha256 --clobber
+          else
+            echo "没有内核产物，跳过"; ls -la xnu-src/BUILD/obj/DEVELOPMENT_ARM64_BCM2837/ | head -5 || true
+          fi
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
