@@ -63,15 +63,19 @@ jobs:
           mkdir -p xnu-deps/host/bin
           cat > xnu-deps/host/bin/xnu-clang <<'SH'
           #!/bin/bash
-          exec xcrun --sdk iphoneos clang "$@"
+          exec xcrun --sdk iphoneos clang -DXNU_NO_TYPE_BUILTINS=1 "$@"
           SH
           cat > xnu-deps/host/bin/xnu-clang++ <<'SH'
           #!/bin/bash
-          exec xcrun --sdk iphoneos clang++ "$@"
+          exec xcrun --sdk iphoneos clang++ -DXNU_NO_TYPE_BUILTINS=1 "$@"
           SH
           chmod +x xnu-deps/host/bin/xnu-clang xnu-deps/host/bin/xnu-clang++
           PATH="$PWD/xnu-deps/host/bin:$PATH" xnu-clang --version | head -2
 
+      - name: 装 unifdef / csh（setup 生成 firehose 头要用）
+        run: |
+          brew install unifdef csh 2>&1 | tail -3 || true
+          which unifdef || echo "unifdef 还是没有"
       - name: 准备依赖（macOS 走 Xcode 的 cctools/mig，不用 theos）
         env:
           XNU_SRC: ${{ github.workspace }}/xnu-src
