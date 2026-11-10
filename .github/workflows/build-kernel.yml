@@ -86,9 +86,13 @@ jobs:
           MACHINE: BCM2837
         run: |
           set -o pipefail
-          bash xnu-build.sh -j"$(sysctl -n hw.ncpu)" -k 2>&1 | tail -60 || true
+          bash xnu-build.sh -j"$(sysctl -n hw.ncpu)" -k > build.log 2>&1 || true
+          echo "---- 错误（前 40 条）----"
+          grep -nE "error:" build.log | head -40 || true
+          echo "---- 日志尾部 ----"
+          tail -30 build.log || true
           echo "---- 产物 ----"
-          ls -la xnu-src/BUILD/obj/DEVELOPMENT_ARM64_BCM2837/ || true
+          ls -la xnu-src/BUILD/obj/DEVELOPMENT_ARM64_BCM2837/ | head -20 || true
 
       - uses: actions/upload-artifact@v4
         with:
@@ -96,4 +100,5 @@ jobs:
           path: |
             xnu-src/BUILD/obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837
             xnu-src/BUILD/obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped
+            build.log
           if-no-files-found: warn
