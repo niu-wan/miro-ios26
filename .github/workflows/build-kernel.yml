@@ -97,7 +97,7 @@ jobs:
           # libfirehose 手工构建（用源码树的头，而不是被 unifdef 过的 EXPORT_HDRS）
           S=xnu-src
           mkdir -p xnu-deps/build/firehose
-          xnu-clang -arch arm64e -c -Os -mkernel -nostdinc -fno-builtin \
+          xnu-deps/host/bin/xnu-clang -arch arm64e -c -Os -mkernel -nostdinc -fno-builtin \
             -DKERNEL=1 -DKERNEL_PRIVATE=1 -DXNU_KERNEL_PRIVATE=1 -DPRIVATE=1 -D__DARWIN_64_BIT_INO_T=1 \
             -DDISPATCH_USE_DTRACE=0 -DOS_ATOMIC_CONFIG_MEMORY_ORDER_DEPENDENCY=1 \
             -DOS_ATOMIC_CONFIG_STARVATION_FREE_ONLY=0 -DOS_FIREHOSE_SPI=1 -DARM64_BOARD_CONFIG_BCM2837 \
