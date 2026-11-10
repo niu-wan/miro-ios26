@@ -53,6 +53,7 @@ jobs:
             [ -d "$sdk" ] || continue
             sudo mkdir -p "$sdk/usr/local/libexec"
             sudo cp xnu-deps/AvailabilityVersions/availability.pl "$sdk/usr/local/libexec/availability.pl"
+            sudo chmod 755 "$sdk/usr/local/libexec/availability.pl"
             ls -l "$sdk/usr/local/libexec/availability.pl"
           done
           echo "xcrun 报的 SDK：$(xcrun --sdk iphoneos --show-sdk-path 2>&1 || true)"
