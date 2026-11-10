@@ -89,6 +89,7 @@ jobs:
       - name: 把 setup 生成的 usr/local 同步进 Xcode SDK（firehose 头在这里）
         run: |
           set -x
+          bash xnu-deps/setup.sh --stage2 2>&1 | tail -15 || true
           SRC=$(ls -d xnu-deps/sdk/*/ | head -1)
           XS=$(xcrun --sdk iphoneos --show-sdk-path)
           echo "SRC=$SRC"; echo "XS=$XS"
