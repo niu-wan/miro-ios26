@@ -46,13 +46,16 @@ jobs:
           sed -i '' 's|-output /dev/null|-output $(OBJPATH)/export-check.out|g' config/Makefile
           grep -n "export-check.out" config/Makefile | head -3
 
-      - name: 补 availability.pl 到 Xcode SDK（generate_aliases 需要它）
+      - name: 补 availability.pl 到所有 iPhoneOS SDK（generate_aliases 需要它）
         run: |
-          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          echo "SDK=$SDK"
-          sudo mkdir -p "$SDK/usr/local/libexec"
-          sudo cp xnu-deps/AvailabilityVersions/availability.pl "$SDK/usr/local/libexec/"
-          ls -la "$SDK/usr/local/libexec/availability.pl"
+          set -x
+          for sdk in /Applications/Xcode*.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS*.sdk; do
+            [ -d "$sdk" ] || continue
+            sudo mkdir -p "$sdk/usr/local/libexec"
+            sudo cp xnu-deps/AvailabilityVersions/availability.pl "$sdk/usr/local/libexec/availability.pl"
+            ls -l "$sdk/usr/local/libexec/availability.pl"
+          done
+          echo "xcrun 报的 SDK：$(xcrun --sdk iphoneos --show-sdk-path 2>&1 || true)"
 
       - name: 在 macOS 上把 xnu-clang 做成直通 Xcode clang
         run: |
