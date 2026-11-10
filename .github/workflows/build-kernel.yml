@@ -87,6 +87,11 @@ jobs:
           bash xnu-deps/setup.sh 2>&1 | tail -40
 
       - name: 把 setup 生成的 usr/local 同步进 Xcode SDK（firehose 头在这里）
+        env:
+          XNU_SRC: ${{ github.workspace }}/xnu-src
+          RC_DARWIN_KERNEL_VERSION: 12377.121.6
+          XNU_ARCH: arm64e
+          MACHINE: BCM2837
         run: |
           set -x
           bash xnu-deps/setup.sh --stage2 2>&1 | tail -15 || true
