@@ -46,6 +46,14 @@ jobs:
           sed -i '' 's|-output /dev/null|-output $(OBJPATH)/export-check.out|g' config/Makefile
           grep -n "export-check.out" config/Makefile | head -3
 
+      - name: 补 availability.pl 到 Xcode SDK（generate_aliases 需要它）
+        run: |
+          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          echo "SDK=$SDK"
+          sudo mkdir -p "$SDK/usr/local/libexec"
+          sudo cp xnu-deps/AvailabilityVersions/availability.pl "$SDK/usr/local/libexec/"
+          ls -la "$SDK/usr/local/libexec/availability.pl"
+
       - name: 准备依赖（macOS 走 Xcode 的 cctools/mig，不用 theos）
         env:
           XNU_SRC: ${{ github.workspace }}/xnu-src
@@ -55,14 +63,6 @@ jobs:
         run: |
           chmod +x xnu-deps/setup.sh xnu-build.sh
           bash xnu-deps/setup.sh 2>&1 | tail -40
-
-      - name: 补 availability.pl 到 Xcode SDK（generate_aliases 需要它）
-        run: |
-          SDK=$(xcrun --sdk iphoneos --show-sdk-path)
-          echo "SDK=$SDK"
-          sudo mkdir -p "$SDK/usr/local/libexec"
-          sudo cp xnu-deps/AvailabilityVersions/availability.pl "$SDK/usr/local/libexec/"
-          ls -la "$SDK/usr/local/libexec/availability.pl"
 
       - name: 在 macOS 上把 xnu-clang 做成直通 Xcode clang
         run: |
