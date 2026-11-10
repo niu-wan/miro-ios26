@@ -87,8 +87,12 @@ jobs:
         run: |
           set -o pipefail
           bash xnu-build.sh -j"$(sysctl -n hw.ncpu)" -k > build.log 2>&1 || true
-          echo "---- 错误（前 40 条）----"
-          grep -nE "error:" build.log | head -40 || true
+          echo "---- exporthdrs 日志（尾 40 行）----"
+          tail -40 xnu-deps/exporthdrs.log 2>/dev/null || echo "(没有 exporthdrs.log)"
+          echo "---- 错误种类（去重）----"
+          grep -oE "error: [^\"]{0,90}" build.log | sed -E 's/[0-9]+/N/g' | sort | uniq -c | sort -rn | head -30 || true
+          echo "---- 错误（前 60 条原文）----"
+          grep -nE "error:" build.log | head -60 || true
           echo "---- 日志尾部 ----"
           tail -30 build.log || true
           echo "---- 产物 ----"
