@@ -54,16 +54,6 @@ jobs:
           sudo cp xnu-deps/AvailabilityVersions/availability.pl "$SDK/usr/local/libexec/"
           ls -la "$SDK/usr/local/libexec/availability.pl"
 
-      - name: 准备依赖（macOS 走 Xcode 的 cctools/mig，不用 theos）
-        env:
-          XNU_SRC: ${{ github.workspace }}/xnu-src
-          RC_DARWIN_KERNEL_VERSION: 12377.121.6
-          XNU_ARCH: arm64e
-          MACHINE: BCM2837
-        run: |
-          chmod +x xnu-deps/setup.sh xnu-build.sh
-          bash xnu-deps/setup.sh 2>&1 | tail -40
-
       - name: 在 macOS 上把 xnu-clang 做成直通 Xcode clang
         run: |
           mkdir -p xnu-deps/host/bin
@@ -77,6 +67,16 @@ jobs:
           SH
           chmod +x xnu-deps/host/bin/xnu-clang xnu-deps/host/bin/xnu-clang++
           PATH="$PWD/xnu-deps/host/bin:$PATH" xnu-clang --version | head -2
+
+      - name: 准备依赖（macOS 走 Xcode 的 cctools/mig，不用 theos）
+        env:
+          XNU_SRC: ${{ github.workspace }}/xnu-src
+          RC_DARWIN_KERNEL_VERSION: 12377.121.6
+          XNU_ARCH: arm64e
+          MACHINE: BCM2837
+        run: |
+          chmod +x xnu-deps/setup.sh xnu-build.sh
+          bash xnu-deps/setup.sh 2>&1 | tail -40
 
       - name: 编内核（arm64e）
         env:
