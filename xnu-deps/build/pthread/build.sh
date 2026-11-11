@@ -7,11 +7,11 @@ set -e
 # as a real kext these live in a separate link unit.
 cd "$(dirname "${BASH_SOURCE[0]}")"
 source ../../../xnu-env.sh
-X=$XNU_SRC; E=$X/BUILD/obj/EXPORT_HDRS; P=$XNUDEPS/libpthread
+X=${XNU_SRC:-$XNU_SRC}; X=$(cd "$X" && pwd); E=$X/BUILD/obj/EXPORT_HDRS; P=$XNUDEPS/libpthread
 [ -d $E/osfmk ] || { echo "pthread kext: no exported kernel headers in $E (run: xnu-build.sh exporthdrs)" >&2; exit 1; }
 mkdir -p $XNU_SDK_PATH/usr/local/lib/kernel
 for f in kern_init kern_support kern_synch; do
-  xnu-clang -arch ${XNU_ARCH:-arm64} -c -Os -mkernel -nostdinc -fno-builtin -fno-common -Wno-int-conversion \
+  xnu-clang -arch ${XNU_ARCH:-arm64} -c -Os -mkernel -fno-builtin -fno-common -Wno-int-conversion \
     -DKERNEL=1 -DKERNEL_PRIVATE=1 -DPRIVATE=1 -D__PTHREAD_EXPOSE_INTERNALS__=1 -Dpthread_kern=pthread_kext_kern -Dcurrent_uthread=pthread_kext_current_uthread -D__DARWIN_64_BIT_INO_T=1 -DARM64_BOARD_CONFIG_BCM2837 \
     -Iinc -I$P -I$X/osfmk -I$E/osfmk -I$X/bsd -I$E/bsd -I$X/libkern -I$E/libkern -I$X/pexpert -I$E/pexpert \
     -I$X/iokit -I$E/iokit -I$X/security -I$E/security -I$X/EXTERNAL_HEADERS \
