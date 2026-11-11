@@ -102,11 +102,16 @@ jobs:
           MACHINE: BCM2837
         run: |
           set -x
-          # 用预编译的 arm64e 内核库（本地用 setup.sh --rebuild-libs 生成）
+          # 必须用 Apple clang 现编：Linux 编的库会把 kext 里的函数指针签名成
+          # 另一套修饰符，内核 pthread_init -> pthread_functions->pthread_init 会 FPAC
+          bash xnu-deps/setup.sh --rebuild-libs 2>&1 | tail -15 || true
           L=xnu-deps/sdk/iPhoneOS26.5.xnu.sdk/usr/local/lib/kernel
           mkdir -p "$L"
-          cp xnu-deps/prebuilt/libfirehose_kernel.a "$L/"
-          cp xnu-deps/prebuilt/libpthread_kext.a "$L/"
+          if [ ! -f "$L/libpthread_kext.a" ] || [ ! -f "$L/libfirehose_kernel.a" ]; then
+            echo "现编失败，退回预编译库（有 PAC 风险）"
+            cp xnu-deps/prebuilt/libfirehose_kernel.a "$L/" || true
+            cp xnu-deps/prebuilt/libpthread_kext.a "$L/" || true
+          fi
           ls -l "$L"
 
           SRC=$(ls -d xnu-deps/sdk/*/ | head -1)
