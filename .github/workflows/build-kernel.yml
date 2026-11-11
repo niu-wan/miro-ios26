@@ -104,13 +104,22 @@ jobs:
           set -x
           # 必须用 Apple clang 现编：Linux 编的库会把 kext 里的函数指针签名成
           # 另一套修饰符，内核 pthread_init -> pthread_functions->pthread_init 会 FPAC
+          # 导出的头（EXPORT_HDRS）在 unifdef 时把 XNU_KERNEL_PRIVATE 段剥掉了，
+          # 但声明还在 -> 编 firehose/pthread 库时会报 unknown type name。
+          # 这里把缺的私有宏补回去（只补这几行，不动其它内容）。
+          H=xnu-src/BUILD/obj/EXPORT_HDRS/osfmk/kern/lock_rw.h
+          if [ -f "$H" ] && ! grep -q "define __lck_rw_other_extern" "$H"; then
+            echo "补 EXPORT_HDRS 里被剥离的私有宏"
+            { printf '#ifndef __LCK_RW_EXPORT_FIX\n#define __LCK_RW_EXPORT_FIX\n#define __lck_rw_other_extern   extern __attribute__((overloadable))\n#define __lck_rw_new_func       __attribute__((overloadable))\n#define __lck_rw_old_func\n#define __enum_closed_decl(name, type, ...) enum name : type __VA_ARGS__\n#define __enum_open_decl(name, type, ...) enum name : type __VA_ARGS__\n#endif\n'; cat "$H"; } > "$H.new"
+            mv "$H.new" "$H"
+            grep -c "define __lck_rw_other_extern" "$H"
+          fi
           bash xnu-deps/setup.sh --rebuild-libs 2>&1 | tail -15 || true
           L=xnu-deps/sdk/iPhoneOS26.5.xnu.sdk/usr/local/lib/kernel
           mkdir -p "$L"
           if [ ! -f "$L/libpthread_kext.a" ] || [ ! -f "$L/libfirehose_kernel.a" ]; then
-            echo "现编失败，退回预编译库（有 PAC 风险）"
-            cp xnu-deps/prebuilt/libfirehose_kernel.a "$L/" || true
-            cp xnu-deps/prebuilt/libpthread_kext.a "$L/" || true
+            echo "::error::现编 kext 库失败，用的是 Linux 编的库，内核会在 pthread_init 处 FPAC"
+            exit 1
           fi
           ls -l "$L"
 
