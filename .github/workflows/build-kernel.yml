@@ -155,6 +155,10 @@ jobs:
             cp "$K" mach.development.bcm2837.arm64e
             shasum -a 256 mach.development.bcm2837.arm64e | tee kernel.sha256
             gh release upload "$TAG" mach.development.bcm2837.arm64e kernel.sha256 --clobber
+            # 再传一份 7MB 分片：某些网络对单次响应有 20MB 上限，整包下不动时用分片
+            rm -f part.*; split -b 7000000 mach.development.bcm2837.arm64e part.
+            ls -l part.*
+            gh release upload "$TAG" part.* --clobber
           else
             echo "没有内核产物，跳过"; ls -la xnu-src/BUILD/obj/DEVELOPMENT_ARM64_BCM2837/ | head -5 || true
           fi
