@@ -4,6 +4,9 @@ on:
   # 内核已在 Linux 上编出来了，这里只保留手动触发，避免每次 push 白烧 macOS 额度
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   kernel:
     # macOS runner: 这里要的就是 Xcode 自带的 cctools/mig/SDK —— Linux 上卡住的那几样
