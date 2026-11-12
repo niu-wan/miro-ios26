@@ -507,11 +507,11 @@ hakios_ensure_dev_dir(void)
 
 	if (vnode_lookup("/dev", 0, &dVP, ctx) == 0) {
 		vnode_put(dVP);
-		bsd_init_kprintf("hakios: /dev already exists\n");
+		kprintf("hakios: /dev already exists\n");
 		return;
 	}
 	if (vnode_lookup("/", 0, &dvp, ctx) != 0) {
-		bsd_init_kprintf("hakios: cannot look up / for mkdir /dev\n");
+		kprintf("hakios: cannot look up / for mkdir /dev\n");
 		return;
 	}
 
@@ -523,8 +523,8 @@ hakios_ensure_dev_dir(void)
 	VATTR_SET(&va, va_mode, 0755);
 	VATTR_SET(&va, va_type, VDIR);
 
-	error = VOP_MKDIR(dvp, &dVP, &cn, &va, ctx);
-	bsd_init_kprintf("hakios: mkdir /dev -> %d\n", error);
+	error = VNOP_MKDIR(dvp, &dVP, &cn, &va, ctx);
+	kprintf("hakios: mkdir /dev -> %d\n", error);
 	if (dVP != NULL) {
 		vnode_put(dVP);
 	}
