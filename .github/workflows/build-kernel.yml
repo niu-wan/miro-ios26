@@ -82,6 +82,8 @@ jobs:
       - name: 覆盖补丁缺失的源文件（miro 的 nw_wifi_* 桩）
         run: |
           cp -v xnu-overlay/bsd/dev/hakios_dada_wlan.c xnu-src/bsd/dev/hakios_dada_wlan.c
+          cp -v xnu-overlay/bsd/kern/bsd_init.c xnu-src/bsd/kern/bsd_init.c
+          grep -c "hakios_ensure_dev_dir" xnu-src/bsd/kern/bsd_init.c
           grep -c "nw_wifi_scan(const uint8_t" xnu-src/bsd/dev/hakios_dada_wlan.c
 
       - name: 准备依赖（macOS 走 Xcode 的 cctools/mig，不用 theos）
