@@ -160,6 +160,11 @@ jobs:
           tail -30 build.log || true
           echo "---- 产物 ----"
           ls -la xnu-src/BUILD/obj/DEVELOPMENT_ARM64_BCM2837/ | head -20 || true
+          # make 在有错误时仍可能返回 0（Target not remade），必须显式检查产物
+          if [ ! -f xnu-src/BUILD/obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837 ]; then
+            echo "::error::没有产出内核镜像，构建失败"
+            exit 1
+          fi
 
       - name: 内核传到 release（artifact 配额已满，走 release 资产）
         if: always()
@@ -178,7 +183,9 @@ jobs:
             ls -l part.*
             gh release upload "$TAG" part.* --clobber
           else
-            echo "没有内核产物，跳过"; ls -la xnu-src/BUILD/obj/DEVELOPMENT_ARM64_BCM2837/ | head -5 || true
+            echo "::error::没有内核产物（构建失败），release 未更新"
+            ls -la xnu-src/BUILD/obj/DEVELOPMENT_ARM64_BCM2837/ | head -5 || true
+            exit 1
           fi
 
       - uses: actions/upload-artifact@v4
