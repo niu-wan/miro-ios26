@@ -3,6 +3,7 @@
 #
 #   ./scripts/mkroot-image.sh            # small：launchd + dyld + 常用空目录（含 /dev），约 4 MB
 #   ./scripts/mkroot-image.sh full       # full：再加 iOS 26 的 dyld 共享缓存（约 5.4 GB）
+#   ./scripts/mkroot-image.sh fullz      # full + zlib 压缩（约 2.1 GB，能进 payload）
 #
 # 为什么要在镜像里放 /dev：根盘是 **只读** APFS（vfs_conf.c 里 MNT_RDONLY），
 # 内核里 mkdir("/dev") 一定失败，devfs_kernel_mount("/dev") 就会 ENOENT。
@@ -32,7 +33,56 @@ chmod 1777 "$STAGE/tmp"
 # /var 是 iOS 里 /private/var 的软链，launchd 会走它
 ln -sfn private/var "$STAGE/var"
 
-if [ "$MODE" = "full" ]; then
+# 账户数据库：launchd 的 init-with-data-volume 会 getpwnam("mobile")，
+# 没有就 abort（"unable to resolve 'mobile': 114"）。iOS 的账户在数据卷的
+# dslocal 里，这里没有数据卷，只能给一份静态文件让它回落到 files 节点。
+mkdir -p "$STAGE/etc" "$STAGE/private/etc"
+cat > "$STAGE/etc/master.passwd" <<'PW'
+nobody:*:-2:-2::0:0:Unprivileged User:/var/empty:/usr/bin/false
+root:*:0:0::0:0:System Administrator:/var/root:/bin/sh
+daemon:*:1:1::0:0:System Services:/var/root:/usr/bin/false
+operator:*:2:2::0:0:Operator:/var/root:/bin/sh
+bin:*:7:7::0:0:Binaries:/bin:/usr/bin/false
+nobody:*:-2:-2::0:0:Unprivileged User:/var/empty:/usr/bin/false
+_xpcproxy:*:305:305::0:0:XPC Services:/var/xpcproxy:/usr/bin/false
+_securityd:*:64:64::0:0:securityd:/var/empty:/usr/bin/false
+_sandbox:*:60:60::0:0:sandbox:/var/empty:/usr/bin/false
+_taskgated:*:462:462::0:0:taskgated:/var/empty:/usr/bin/false
+_mbsetupuser:*:248:248::0:0:mbsetupuser:/var/mobile:/usr/bin/false
+mobile:********:501:501::0:0:Mobile User:/var/mobile:/bin/sh
+_analyticsusers:*:250:250::0:0:analyticsusers:/var/empty:/usr/bin/false
+_windowserver:*:88:88::0:0:WindowServer:/var/empty:/usr/bin/false
+_locationd:*:205:205::0:0:locationd:/var/empty:/usr/bin/false
+_networkd:*:24:24::0:0:networkd:/var/empty:/usr/bin/false
+_coreaudiod:*:202:202::0:0:coreaudiod:/var/empty:/usr/bin/false
+_driverkit:*:464:464::0:0:DriverKit:/var/empty:/usr/bin/false
+PW
+cat > "$STAGE/etc/group" <<'GR'
+wheel:*:0:root
+daemon:*:1:root
+kmem:*:2:root
+sys:*:3:root
+tty:*:4:root
+operator:*:5:root
+bin:*:7:root
+nobody:*:-2:
+nogroup:*:-1:
+staff:*:20:root
+admin:*:80:root
+_xpcproxy:*:305:
+_securityd:*:64:
+_sandbox:*:60:
+mobile:*:501:
+_analyticsusers:*:250:
+GR
+printf '/bin/sh\n/bin/csh\n/usr/bin/false\n' > "$STAGE/etc/shells"
+# /private/etc 是 iOS 里 /etc 的真实位置，两处都放一份，避免哪条路径都找不到
+for f in master.passwd group shells motd; do
+	[ -f "$STAGE/etc/$f" ] && cp "$STAGE/etc/$f" "$STAGE/private/etc/$f"
+done
+chmod 644 "$STAGE/etc/master.passwd" "$STAGE/etc/group"
+
+if [ "$MODE" = "full" ] || [ "$MODE" = "fullz" ]; then
 	CACHE=$SRC/System/Library/Caches/com.apple.dyld
 	[ -d "$CACHE" ] || { echo "缺少共享缓存 $CACHE"; exit 1; }
 	echo "→ 拷共享缓存（$(du -sh "$CACHE" | cut -f1)）"
@@ -45,6 +95,11 @@ if [ "$MODE" = "full" ]; then
 fi
 
 echo "→ 打包 $OUT"
-python3 "$MKAPFS" -o "$OUT" "ROOT=$STAGE"
+if [ "$MODE" = "fullz" ]; then
+	# 5.3 GB 压到 2.1 GB 左右，才能塞进 XNUP 的 u32 单包上限（4 GB）
+	python3 "$MKAPFS" -z --slack 512 -o "$OUT" "ROOT=$STAGE"
+else
+	python3 "$MKAPFS" -o "$OUT" "ROOT=$STAGE"
+fi
 ls -l "$OUT"
 python3 /home/niu/project/dome/hakios-ref/userland/tools/apfs/apfs.py tree "$OUT" | head -25
