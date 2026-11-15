@@ -82,6 +82,7 @@
 #include <sys/param.h>
 #include <sys/filedesc.h>
 #include <sys/kernel.h>
+#include <sys/mount.h>            /* for MNT_DONTBROWSE */
 #include <sys/mount_internal.h>
 #include <sys/proc_internal.h>
 #include <sys/kauth.h>
@@ -529,6 +530,88 @@ hakios_ensure_dev_dir(void)
 		vnode_put(dVP);
 	}
 	vnode_put(dvp);
+}
+
+/*
+ * hakios: /private/var 必须是可写的。根盘是只读 APFS（端口本身就是只读驱动），
+ * launchd 的 init-with-data-volume / fixup-mobile-tmp 一写就 EROFS：
+ *   (fixup-mobile-tmp) <Error>: could not set create /private/var/mobile/tmp: Read-only file system
+ * 这里在挂完 devfs 之后把 ramfs 挂到 /private/var（等同于真机的 data 卷），
+ * 并按 iOS 的布局建出最常用的几个目录，避免 launchd 直接 mkdir 一个多级路径时 ENOENT。
+ */
+static int
+hakios_mkdir_p(const char *path, mode_t mode, uid_t uid, gid_t gid, int depth)
+{
+	char buf[256];
+	vnode_t dvp = NULLVP;
+	vnode_t dVP = NULL;
+	struct componentname cn;
+	struct vnode_attr va;
+	vfs_context_t ctx = vfs_context_kernel();
+	char *slash;
+	int error;
+
+	if (depth > 8) {
+		return ELOOP;
+	}
+	if (vnode_lookup(path, 0, &dVP, ctx) == 0) {
+		vnode_put(dVP);
+		return 0;
+	}
+	strlcpy(buf, path, sizeof(buf));
+	slash = strrchr(buf, '/');
+	if (slash == NULL || slash == buf) {
+		return EINVAL;
+	}
+	*slash = '\0';
+	error = hakios_mkdir_p(buf, 0755, 0, 0, depth + 1);
+	if (error != 0 && error != EEXIST) {
+		return error;
+	}
+	if (vnode_lookup(buf, 0, &dvp, ctx) != 0) {
+		return ENOENT;
+	}
+	memset(&cn, 0, sizeof(cn));
+	cn.cn_nameptr = slash + 1;
+	cn.cn_namelen = (int)strlen(cn.cn_nameptr);
+	VATTR_INIT(&va);
+	VATTR_SET(&va, va_mode, mode);
+	VATTR_SET(&va, va_type, VDIR);
+	VATTR_SET(&va, va_uid, uid);
+	VATTR_SET(&va, va_gid, gid);
+	error = VNOP_MKDIR(dvp, &dVP, &cn, &va, ctx);
+	if (dVP != NULL) {
+		vnode_put(dVP);
+	}
+	vnode_put(dvp);
+	return error;
+}
+
+static void
+hakios_mount_var(void)
+{
+	vfs_context_t ctx = vfs_context_kernel();
+	int error;
+
+	error = kernel_mount("ramfs", NULLVP, NULLVP, "/private/var", NULL, 0,
+	    MNT_DONTBROWSE, KERNEL_MOUNT_NOAUTH, ctx);
+	kprintf("hakios: mount ramfs on /private/var -> %d\n", error);
+	if (error != 0) {
+		return;
+	}
+
+	hakios_mkdir_p("/private/var/mobile", 0755, 501, 501, 0);
+	hakios_mkdir_p("/private/var/mobile/tmp", 01777, 501, 501, 0);
+	hakios_mkdir_p("/private/var/mobile/Library", 0755, 501, 501, 0);
+	hakios_mkdir_p("/private/var/mobile/Containers", 0755, 501, 501, 0);
+	hakios_mkdir_p("/private/var/root", 0700, 0, 0, 0);
+	hakios_mkdir_p("/private/var/tmp", 01777, 0, 0, 0);
+	hakios_mkdir_p("/private/var/db", 0755, 0, 0, 0);
+	hakios_mkdir_p("/private/var/log", 0755, 0, 0, 0);
+	hakios_mkdir_p("/private/var/run", 0755, 0, 0, 0);
+	hakios_mkdir_p("/private/var/cores", 0755, 0, 0, 0);
+	hakios_mkdir_p("/private/var/containers", 0755, 0, 0, 0);
+	kprintf("hakios: /private/var skeleton ready\n");
 }
 
 void
@@ -1053,6 +1136,7 @@ bsd_init(void)
 		hakios_ensure_dev_dir();
 		bsd_init_kprintf("calling devfs_kernel_mount\n");
 		devfs_kernel_mount(mounthere);
+		hakios_mount_var();             /* /private/var 换成可写的 ramfs */
 		redwood_input_init();           /* /dev/redwood-touch */
 		redwood_audio_init();           /* /dev/redwood-audio */
 		redwood_virtio_blk_init();      /* /dev/rvblk0, a disk image of the host (QEMU) */
