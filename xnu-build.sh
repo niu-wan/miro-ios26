@@ -1,7 +1,16 @@
 #!/bin/bash
 # Build XNU for redwood on Linux. Extra make args are passed through.
 source "$(dirname "${BASH_SOURCE[0]}")/xnu-env.sh"
+# 应用给 PID 1 传 DYLD_SHARED_CACHE_DIR 的补丁（若仓库里有这个脚本）。
+# 放在这里而不是 .github/workflows/ 里：改 workflow 文件需要 token 额外的
+# Workflows: Read and write 权限，改这个脚本只要 Contents。脚本是幂等的，
+# 与 workflow 里那一步并存也不会重复插入。
+# 必须在 cd 之前取绝对路径：BASH_SOURCE 是相对的，cd 之后 dirname 会指错。
+INIT_ENVP="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/scripts/patch-init-envp.sh"
 cd "$XNU_SRC" || exit 1
+if [ -f "$INIT_ENVP" ]; then
+	bash "$INIT_ENVP" "$XNU_SRC" || exit 1
+fi
 # The Wi-Fi driver's object is linked into the kernel when it is there; make does not see it change, so the linked
 # kernel is thrown away when it has. redwood's is ath11k (tools/mk-ath11k.sh, WCN6750), dada's is ath12k
 # (tools/mk-ath12k.sh, peach); each build has at most one.
