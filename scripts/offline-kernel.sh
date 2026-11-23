@@ -33,7 +33,8 @@ TREE=$DOME/.build/xnu-src
 DEPS=$HAKIOS/xnu-deps
 SDK=$DEPS/sdk/iPhoneOS26.5.xnu.sdk
 OUT=$ROOT/out
-KERNEL=$TREE/BUILD/obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837
+# 默认用本地编译产物；可用 KERNEL=... 指向别处（例如从 CI release 拉下来的内核）
+KERNEL=${KERNEL:-$TREE/BUILD/obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837}
 BASE_PAYLOAD=$OUT/payload-kernel-arm64e-rd.bin
 IMG=${IMG:-$OUT/root-slim2.apfs}
 PAYLOAD=${PAYLOAD:-$OUT/payload-local-envp.bin}
@@ -91,12 +92,22 @@ cmd_check() {
 		|| warn "缺根盘 $IMG（只影响 boot 步骤）"
 
 	if command -v fastboot >/dev/null; then
-		local dev
-		dev=$(timeout 15 fastboot devices 2>/dev/null | head -1)
-		[ -n "$dev" ] && ok "设备在线：$dev" || warn "设备未连接（只影响 boot 步骤）"
+		local fbdev adbdev
+		fbdev=$(fb_devices_local); [ -n "$fbdev" ] || fbdev=$(fb_devices_agent)
+		adbdev=$(adb_devices_local)
+		if [ -n "$fbdev" ]; then
+			ok "设备在 fastboot：$fbdev"
+		elif [ -n "$adbdev" ]; then
+			ok "设备在 ADB：$adbdev（boot 时会自动重启进 bootloader）"
+		else
+			warn "设备未连接（本地 USB 与宿主代理都看不到；只影响 boot 步骤）"
+		fi
 	else
 		warn "本机没有 fastboot（只影响 boot 步骤）"
 	fi
+
+	[ -f "$ROOT/out/miro-p2-platform.img" ] && ok "loader miro-p2-platform.img" \
+		|| warn "缺 out/miro-p2-platform.img（只影响 boot 步骤）"
 
 	[ $fail -eq 0 ] && printf '\n  预检通过。\n' || { printf '\n'; die "预检未通过"; }
 }
@@ -212,17 +223,60 @@ cmd_payload() {
 	"$PY" "$ROOT/scripts/mkpayload.py" list "$PAYLOAD"
 }
 
+# 设备只要在 fastboot 或 ADB 任一种模式就算"可用"：ADB 时 boot 会自己重启
+#
+# 注意：不能只用裸 fastboot。本机可能没有 /dev/bus/usb 的访问权（要经宿主代理），
+# 也可能有；两种情况下"看不到设备"的原因不同。这里三条路径都试：
+#   1. 本地 fastboot（有 /dev/bus/usb 且插着线时）
+#   2. 本地 adb
+#   3. 宿主代理 http://127.0.0.1:8799 的 /run（沙箱里的标准通道）
+fb_devices_local() { timeout 15 fastboot devices 2>/dev/null | awk 'NF{print $1; exit}'; }
+adb_devices_local() { timeout 12 adb devices 2>/dev/null | awk 'NR>1 && $2=="device"{print $1; exit}'; }
+fb_devices_agent() {
+	local tok url
+	url=${FB_AGENT_URL:-http://127.0.0.1:8799}
+	tok=${FB_AGENT_TOKEN:-$(cat "$ROOT/out/.fbtok" 2>/dev/null)}
+	[ -n "$tok" ] || return 1
+	curl -sS --max-time 20 -X POST "$url/run" \
+		-H "Content-Type: application/json" -H "X-Token: $tok" \
+		-d '{"argv":["fastboot","devices"],"timeout":20}' 2>/dev/null |
+		"$PY" -c 'import sys,json;d=json.load(sys.stdin);print(d.get("out","").split()[0] if d.get("out","").strip() else "")' 2>/dev/null
+}
+device_ready() {
+	[ -n "$(fb_devices_local)" ] && return 0
+	[ -n "$(adb_devices_local)" ] && return 0
+	[ -n "$(fb_devices_agent)" ] && return 0
+	return 1
+}
+
 # ---------------------------------------------------------------- boot
 cmd_boot() {
 	step "上机测试"
-	local dev
-	dev=$(timeout 15 fastboot devices 2>/dev/null | head -1)
-	[ -n "$dev" ] || die "设备未连接（fastboot devices 为空）"
 	[ -f "$PAYLOAD" ] || die "缺载荷 $PAYLOAD"
 	[ -f "$IMG" ] || die "缺根盘 $IMG"
-	ok "设备：$dev"
+	[ -f "$ROOT/out/miro-p2-platform.img" ] || die "缺 loader out/miro-p2-platform.img"
+
+	# 设备在 fastboot 或 ADB 都可以：ADB 时 resident-boot-test.sh 自己会
+	# adb reboot bootloader。早先这里只认 fastboot，插着 ADB 的手机被误判成
+	# "设备未连接"直接退出。
+	local fbdev adbdev
+	fbdev=$(fb_devices_local); [ -n "$fbdev" ] || fbdev=$(fb_devices_agent)
+	adbdev=$(adb_devices_local)
+	if [ -n "$fbdev" ]; then
+		ok "设备在 fastboot：$fbdev"
+	elif [ -n "$adbdev" ]; then
+		ok "设备在 ADB：$adbdev（脚本会自己重启进 bootloader）"
+	else
+		die "既不在 fastboot 也不在 ADB（本地 USB 与宿主代理 127.0.0.1:8799 都看不到）——插线并确认手机已开机"
+	fi
 
 	"$ROOT/scripts/resident-boot-test.sh" "$IMG" "$PAYLOAD"
+	local rc=$?
+
+	# 不管内核跑成什么样，先把日志分析做完再退出：失败时的日志才是要看的
+	step "分析日志"
+	"$PY" "$ROOT/scripts/log-report.py" || true
+	return $rc
 }
 
 # ---------------------------------------------------------------- main
@@ -235,7 +289,7 @@ case ${1:-} in
 	all)
 		cmd_build || exit 1
 		cmd_payload || exit 1
-		if [ -n "$(timeout 15 fastboot devices 2>/dev/null | head -1)" ]; then
+		if device_ready; then
 			cmd_boot
 		else
 			warn "设备未连接，停在载荷这一步"
