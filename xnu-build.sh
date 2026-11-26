@@ -7,7 +7,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/xnu-env.sh"
 # 必须在 cd 之前取绝对路径：BASH_SOURCE 是相对的，cd 之后 dirname 会指错。
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$XNU_SRC" || exit 1
-for p in patch-init-envp.sh patch-lookup-probe.sh; do
+for p in patch-init-envp.sh patch-lookup-probe.sh patch-shared-region-einval.sh; do
 	if [ -f "$REPO_DIR/scripts/$p" ]; then
 		bash "$REPO_DIR/scripts/$p" "$XNU_SRC" || exit 1
 	fi

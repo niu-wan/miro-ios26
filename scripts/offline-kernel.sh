@@ -210,6 +210,9 @@ cmd_build() {
 cmd_payload() {
 	step "打载荷"
 	[ -f "$KERNEL" ] || die "缺内核 $KERNEL，先跑 build"
+	# 下载中断会留下 0 字节文件，打出来的载荷 kernel 条目是空的，
+	# loader 只会认到一部分条目，症状很像内核 panic。先挡住。
+	[ -s "$KERNEL" ] || die "内核文件是空的：$KERNEL（下载中断的残留？重新下载）"
 	[ -f "$BASE_PAYLOAD" ] || die "缺基准载荷 $BASE_PAYLOAD"
 
 	"$PY" "$ROOT/scripts/mkpayload.py" build --kernel "$KERNEL" --base "$BASE_PAYLOAD" --out "$PAYLOAD" \

@@ -9,12 +9,15 @@ XNUP 是 xnuloader 认的 payload 容器。格式（本机实测校正过，不�
 
 三个容易踩错的点，都在这里固化成代码：
 
-1. **条目之间没有 16 字节对齐填充**。数据紧接着下一个条目的 name[16] 开始。
-   按 16 对齐去解析，会把下一个条目的 size 字段读错（实测把 ramdisk 的
-   4 MB 读成了 150 MB）。
+1. **每个条目的数据按 16 字节对齐**（loader: `p += sizeof(e) + ((e->size+15)&~15)`）。
+   这一条我最初判反了：当时手上的载荷 kernel/loader.efi/ramdisk 大小都恰好是 16 的
+   倍数，填充长度为 0，于是误以为"没有对齐"。直到内核多了 24 字节、不再是 16 的
+   倍数，loader 就从一个错误偏移开始读下一个条目 —— 日志里出现
+   `payload entry 'fi' size 785a4d` 这种残片，ramdisk 条目整个丢失，
+   驻留区于是被当成普通 ramdisk，把内核的 kmem_range_init 撑爆。
+   **构建时若内核大小不是 16 的倍数，这个错误必然发作。**
 
 2. **条目名可以为空**。空名不等于结束；结束的标志是 size == 0。
-   ramdisk 条目在部分载荷里就是空名。
 
 3. **loader 打印的 size 是十六进制**。日志里 `payload entry 'kernel' size 14db760`
    指的是 0x14db760 = 21,870,432，别当成十进制。
@@ -59,8 +62,15 @@ def parse(path):
         if off + ENT + size > len(d):
             raise SystemExit('条目 @%d size=%d 越界' % (off, size))
         out.append((name, d[off + ENT: off + ENT + size]))
-        off = off + ENT + size          # 注意：无对齐填充
+        # loader 是这么走的：p += sizeof(entry) + ((size + 15) & ~15)
+        off = off + ENT + pad16(size)
     return out
+
+
+def pad16(n):
+    """子缓存的原始大小常常刚好 16 对齐，此时填充长度为 0 —— 早先正是因此
+    误判成「没有对齐填充」。内核大小一变（哪怕只多 24 字节）就会错位。"""
+    return (n + 15) & ~15
 
 
 def write(path, entries):
@@ -71,6 +81,7 @@ def write(path, entries):
         buf += name.ljust(16, b'\0')
         buf += struct.pack('<II', len(data), 0)
         buf += data
+        buf += b'\0' * (pad16(len(data)) - len(data))
     buf += b'\0' * 16 + struct.pack('<II', 0, 0)
     struct.pack_into('<I', buf, 4, len(buf) - HDR)
     with open(path, 'wb') as f:

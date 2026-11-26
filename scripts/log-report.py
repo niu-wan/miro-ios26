@@ -61,6 +61,8 @@ def read_log(rundir):
 
 
 PROBE = re.compile(r'miro: lookup (\S+)')
+# loader 解析载荷时逐条打印：payload entry 'kernel' size ... 
+PAYLOAD_ENTRY = re.compile(r"payload entry '([^']*)' size ([0-9a-fA-F]+)")
 
 
 def first(pat, text, group=1):
@@ -82,6 +84,9 @@ def analyse(text):
                         if 'dyld' in l and ('cache' in l or 'loaded' in l)][:8]
     # 内核探针（patch-lookup-probe.sh）：dyld 有没有去找共享缓存
     r['_lookups'] = PROBE.findall(text)
+    # 载荷解析结果：正常应是 kernel/loader.efi/ramdisk/cmdline 四条。
+    # 少于四条或名字异常 = USB 传输把数据弄错位了，这一轮结果不可用。
+    r['_payload'] = PAYLOAD_ENTRY.findall(text)
     return r
 
 
@@ -96,6 +101,20 @@ def verdict(r):
     if r.get('launchd 启动'):
         return ('progress', 'launchd 已经跑起来（出现 hello, launchd UUID）',
                 '下一关是 launchd 加载 job；看日志里第一个失败的 service。')
+
+    # 先排除「这一轮根本没跑对」：载荷在 USB 上错位时，loader 只认出一两个
+    # 条目，ramdisk 条目丢失会让 rd_size=0，驻留区于是被当成普通 ramdisk，
+    # 5 GB 的 ramdisk 直接把 kernel 的 kmem_range_init 撑爆。
+    # 那个 panic 看起来像内核/镜像问题，其实与两者都无关 —— 必须挡在这里，
+    # 否则会把一次传输抖动误读成内核回归。
+    ents = r.get('_payload') or []
+    names = [n for n, _ in ents]
+    if ents and (len(ents) < 4 or 'ramdisk' not in names):
+        return ('invalid',
+                f"载荷传输损坏：loader 只解析出 {len(ents)} 条 {names}，缺 ramdisk",
+                '不要看后面的 panic —— 那是负载错位的连带结果'
+                '（rd_size=0 → 驻留区被当普通 ramdisk → kmem_range_init panic）。'
+                '与内核、镜像大小都无关，重跑一次即可。')
 
     env_hit = bool(r.get('exec_env 注入'))
     env_note = '（exec_env 注入已生效）' if env_hit else ''
@@ -150,6 +169,12 @@ def build_report(rundir, logpath, r, lvl, msg, adv):
             cell = cell[:90] + '…'
         lines.append(f'| {name} | {cell} |')
     lines.append('')
+    if r['_payload']:
+        lines.append('## 载荷解析（loader 侧）\n')
+        lines.append('```')
+        for n, sz in r['_payload']:
+            lines.append(f"{n:12s} size {sz}  ({int(sz, 16)})")
+        lines.append('```\n')
     if r['_lookups']:
         lines.append('## 内核探针：dyld 查找缓存文件\n')
         lines.append(f'命中 {len(r["_lookups"])} 次：\n')
