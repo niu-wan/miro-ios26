@@ -60,6 +60,9 @@ def read_log(rundir):
     return None, ''
 
 
+PROBE = re.compile(r'miro: lookup (\S+)')
+
+
 def first(pat, text, group=1):
     m = pat.search(text)
     if not m:
@@ -77,6 +80,8 @@ def analyse(text):
     # 单独收所有 dyld 相关行，便于看上下文
     r['_dyld_lines'] = [l.strip() for l in text.splitlines()
                         if 'dyld' in l and ('cache' in l or 'loaded' in l)][:8]
+    # 内核探针（patch-lookup-probe.sh）：dyld 有没有去找共享缓存
+    r['_lookups'] = PROBE.findall(text)
     return r
 
 
@@ -99,11 +104,22 @@ def verdict(r):
     libsys = r.get('libSystem 解析')
 
     if libsys:
+        # 内核探针给出的关键区分：dyld 到底有没有去查缓存文件
+        lk = r.get('_lookups') or []
+        if lk:
+            uniq = sorted(set(lk))
+            more = '：' + '、'.join(uniq[:3]) + ('…' if len(uniq) > 3 else '')
+            return ('stuck',
+                    f'dyld **确实**查找了缓存文件（探针 {len(lk)} 次，{len(uniq)} 种）'
+                    f'{more}{env_note}，但仍未装载：libSystem 解析失败',
+                    '问题不在"找不找"，在"找到之后"：缓存头校验、子缓存预检、'
+                    '或 vm 映射。下一步在 mapSplitCacheSystemWide 的失败分支加探针。')
         if r.get('dyld cache 路径') is None:
             return ('stuck',
-                    f'dyld 不再报 (null)，但缓存仍未装载：libSystem 解析失败{env_note}',
-                    '环境变量已送到，但 dyld 放弃了缓存。下一轮用 exec_env 打开 '
-                    'DYLD_PRINT_WARNINGS=1 / DYLD_PRINT_LIBRARIES=1 看它为什么放弃。')
+                    f'dyld 从未查找缓存文件（探针 0 命中），libSystem 解析失败{env_note}',
+                    '前提：所用内核确实带 patch-lookup-probe（否则 0 命中不代表没查）。'
+                    '若内核带探针，则 dyld 在更早就放弃了：方向转向 cryptex 路径解析、'
+                    '或 ProcessConfig 对平台二进制的 DYLD_* 过滤。')
         return ('stuck',
                 f"dyld 报缓存 '{r.get('dyld cache 路径')}' 未装载，libSystem 解析失败{env_note}",
                 '看 errorMessage：open() failed 查文件与权限；dynamic config 查 .dylddata 子缓存。')
@@ -134,6 +150,15 @@ def build_report(rundir, logpath, r, lvl, msg, adv):
             cell = cell[:90] + '…'
         lines.append(f'| {name} | {cell} |')
     lines.append('')
+    if r['_lookups']:
+        lines.append('## 内核探针：dyld 查找缓存文件\n')
+        lines.append(f'命中 {len(r["_lookups"])} 次：\n')
+        lines.append('```')
+        for n in r['_lookups'][:20]:
+            lines.append(n)
+        if len(r['_lookups']) > 20:
+            lines.append(f'…（另有 {len(r["_lookups"]) - 20} 条）')
+        lines.append('```\n')
     if r['_dyld_lines']:
         lines.append('## dyld 相关行\n')
         lines.append('```')

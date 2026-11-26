@@ -194,6 +194,16 @@ cmd_build() {
 
 	printf '  %s\n' "$KERNEL"
 	printf '  %s 字节  %s\n' "$(stat -c %s "$KERNEL")" "$(file -b "$KERNEL" | cut -c1-60)"
+
+	# 实测：本地 clang 编出的 cpusubtype 是 0x80000002（用户 ABI），CI 的 Xcode
+	# clang 是 0xC0000002（内核 ABI）。拿本地内核上机会 PAC 失败：
+	#   PANIC: PAC failure from kernel with IA key while branching to x8
+	# 所以 build 只用于「确认能编过 + 看补丁字符串」，上机必须用 CI 产物。
+	case $(file -b "$KERNEL") in
+		*PAK00*) ;;
+		*) warn "这份内核 cpusubtype 不是内核 ABI（见上方 file 输出）。"
+		   warn "  拿它上机会 PAC panic —— 上机请用 CI 编出的内核：KERNEL=<ci-kernel> boot" ;;
+	esac
 }
 
 # ---------------------------------------------------------------- payload
