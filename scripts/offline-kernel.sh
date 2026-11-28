@@ -129,6 +129,11 @@ cmd_sync() {
 	grep -q "hakios_mount_var" "$src" || die "bsd_init.c 里没有 ramfs 补丁（hakios_mount_var）"
 
 	bash "$ROOT/scripts/patch-init-envp.sh" "$TREE" || die "init envp 补丁失败"
+
+	# 注意：上面那个 cp 会把 work/bsd_init.c 覆盖过来，所以针对 bsd_init.c
+	# 的补丁必须放在这之后，否则每次 build 都会被冲掉。
+	[ -f "$ROOT/scripts/patch-dyldmap-probe.sh" ] &&
+		{ bash "$ROOT/scripts/patch-dyldmap-probe.sh" "$TREE" || die "dyld 缓存探针补丁失败"; }
 }
 
 # ---------------------------------------------------------------- build
